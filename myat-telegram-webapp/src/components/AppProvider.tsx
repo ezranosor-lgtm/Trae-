@@ -15,6 +15,10 @@ type MeResponse = {
     availablePoints: number;
     referrerId?: string | null;
     referralCount: number;
+    // Database schema ထဲမှာ Level တွေ သိမ်းထားရင် သုံးရန်
+    tapLevel?: number;
+    capLevel?: number;
+    speedLevel?: number;
   };
   tasks: {
     periodKey: string;
@@ -128,6 +132,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loginIfNeeded, refresh]);
 
+  // ⚡ 🌟 BACKGROUND ENERGY REGENERATION ENGINE 
+  // (ဘယ် Page ရောက်ရောက်၊ App ဖွင့်ထားသရွေ့ ၁ စက္ကန့်တစ်ခါ LocalStorage ထဲမှာ ⚡ အားသွင်းပေးမည့်နေရာ)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const interval = setInterval(() => {
+      // LocalStorage ထဲက Level တွေကို ထောက်ပြီး လက်ရှိ Speed နှင့် Max Energy ကို တွက်ချက်မည်
+      const savedCapLvl = localStorage.getItem("tw_lvl_cap") || "1";
+      const savedSpeedLvl = localStorage.getItem("tw_lvl_speed") || "1";
+
+      const maxEnergy = 500 + (Number(savedCapLvl) - 1) * 500;
+      const energyRegenPerSec = 1 + (Number(savedSpeedLvl) - 1);
+
+      const savedEnergy = localStorage.getItem("tw_energy") || "500";
+      let currentEnergy = Number(savedEnergy);
+
+      if (currentEnergy < maxEnergy) {
+        currentEnergy += energyRegenPerSec;
+        if (currentEnergy > maxEnergy) currentEnergy = maxEnergy;
+        
+        // အားတိုးသွားတာကို LocalStorage ထဲ သိမ်းမည်
+        localStorage.setItem("tw_energy", String(currentEnergy));
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const completeTask: Ctx["completeTask"] = useCallback(
     async (taskKey) => {
       setError(null);
@@ -149,13 +181,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [refresh, getRawTelegramInitData],
   );
 
-  // 🕹️ [CONNECTED TO TASKS/COMPLETE] - Backend API အသစ်နှင့် လှမ်းချိတ်ထားသည်
+  // 🕹️ [CONNECTED TO TASKS/COMPLETE] - Backend API
   const addGamePoints = useCallback(
     async (pointsEarned: number) => {
       setError(null);
       const rawToken = getRawTelegramInitData();
       
-      // 1. Frontend UI ကို အရင်ပေါင်းပြထားမည်
       setMe((prevMe) => {
         if (!prevMe) return null;
         return {
@@ -168,7 +199,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
 
       try {
-        // 2. 🚀 ပြင်ဆင်ပြီးသား Backend Task API သို့ ပို့မည် (score က အနှုတ်လည်း လာနိုင်သည် - ဥပမာ Upgrade အတွက်)
         const res = await fetch("/api/tasks/complete", {
           method: "POST",
           headers: { 
@@ -250,4 +280,3 @@ export function useApp() {
   if (!ctx) throw new Error("useApp must be used within AppProvider");
   return ctx;
   }
-    
